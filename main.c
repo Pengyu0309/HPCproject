@@ -7,13 +7,14 @@ static char help[] = "Hello world!\n\n";
 
 int main(int argc, char **argv){
 	MPI_Comm        comm;
-        Vec             x, t,uu,uu_new;
+        Vec             x, t,uu,uu_new,f;
         Mat             A,U;
 	KSP             ksp;
 	PC              pc;
-	PetscInt        ii=0,jj=0,N=10,n=10;
-        PetscScalar     deltax=0.1,deltat=0.1,L=1,T=1,density = 1.0, c = 1.0,f=1.0,k=1.0,h=1.0,g=10;
-	PetscInt        choice = 1;
+	PetscInt        ii=0,jj=0,N=10,N1,Nh,Na,n=10;
+        PetscScalar     deltax=0.1,deltat=0.1,L=1,T=1,density = 1.0, c = 1.0,l=1.0,k=1.0,h=1.0,g=0;
+	PetscInt        choice = 1,heat_flux = 0;
+	PetscScalar     diff,print;
 
 	// initialization
 	PetscInitialize(&argc, &argv, (char*)0, help);
@@ -25,18 +26,21 @@ int main(int argc, char **argv){
 	PetscOptionsGetInt(PETSC_NULL, PETSC_NULL, "-num1", &ii, PETSC_NULL);
         PetscOptionsGetInt(PETSC_NULL, PETSC_NULL, "-num2", &jj, PETSC_NULL);
 	PetscOptionsGetInt(PETSC_NULL, PETSC_NULL, "-choice", &choice, PETSC_NULL);//explict=0;implict=1
+	PetscOptionsGetInt(PETSC_NULL, PETSC_NULL, "-heat_flux", &heat_flux, PETSC_NULL);//constTEM=0;heatflux=1
 	PetscOptionsGetScalar(PETSC_NULL, PETSC_NULL, "-length", &L, PETSC_NULL);
         PetscOptionsGetScalar(PETSC_NULL, PETSC_NULL, "-time", &T, PETSC_NULL);
         PetscOptionsGetScalar(PETSC_NULL, PETSC_NULL, "-density", &density, PETSC_NULL);//density kg/m^3
 	PetscOptionsGetScalar(PETSC_NULL, PETSC_NULL, "-heat_capacity", &c, PETSC_NULL);//heat capacity,J/kg-k
-	PetscOptionsGetScalar(PETSC_NULL, PETSC_NULL, "-heat_supply", &f, PETSC_NULL);//heat supply per unit volume
+	PetscOptionsGetScalar(PETSC_NULL, PETSC_NULL, "-heat_supply", &l, PETSC_NULL);//heat supply per unit volume
 	PetscOptionsGetScalar(PETSC_NULL, PETSC_NULL, "-conductivity", &k, PETSC_NULL);//conductivity, W/m-k
 	PetscOptionsGetScalar(PETSC_NULL, PETSC_NULL, "-heat flux", &h, PETSC_NULL);
 	PetscOptionsGetScalar(PETSC_NULL, PETSC_NULL, "-boundary_temperature", &g, PETSC_NULL);//temperature
 	PetscOptionsGetScalar(PETSC_NULL, PETSC_NULL, "-delta_x", &deltax, PETSC_NULL);
 	PetscOptionsGetScalar(PETSC_NULL, PETSC_NULL, "-delta_t", &deltat, PETSC_NULL);
 	
-	PetscScalar    print;
+	N1 = N-1;
+	Nh = N/2;
+	Na = N+1;
 	//generate vector	
 	//space
 	VecCreate(comm, &x);
@@ -44,14 +48,14 @@ int main(int argc, char **argv){
 	//VecSetType(x,VECMPI);
         VecSetFromOptions(x);
 	VecSet(x, 0.0);
-	for (ii=0;ii<(N+1);ii++){
+	for (ii=0;ii<Na;ii++){
 		VecSetValue(x, ii, ii*deltax, INSERT_VALUES);
 	}
 	VecAssemblyBegin(x);
         VecAssemblyEnd(x);
 	//verify the grid x
 	PetscPrintf(comm,"\nThe Vector x is: ");
-	for (ii=0;ii<(N+1);ii++){
+	for (ii=0;ii<Na;ii++){
                 VecGetValues(x,1,&ii,&print);
 		PetscPrintf(comm,"%g\t",print);
         }
@@ -74,6 +78,26 @@ int main(int argc, char **argv){
                 PetscPrintf(comm,"%g\t",print);
         }
 
+
+	//heat supply
+        VecCreate(comm, &f);
+        VecSetSizes(f, PETSC_DECIDE, N+1);
+        //VecSetType(f,VECMPI);
+        VecSetFromOptions(f);
+        VecSet(f, 0.0);
+        for (ii=0;ii<Na;ii++){
+                VecSetValue(f, ii, sin(l*3.1415*ii*deltax), INSERT_VALUES);
+        }
+        VecAssemblyBegin(f);
+        VecAssemblyEnd(f);
+        //verify the grid f
+        PetscPrintf(comm,"\nThe Vector f is: ");
+        for (ii=0;ii<Na;ii++){
+                VecGetValues(f,1,&ii,&print);
+                PetscPrintf(comm,"%g\t",print);
+        }
+
+
 	//generate matrix A
 	MatCreate(comm, &A);
         MatSetSizes(A, PETSC_DECIDE, PETSC_DECIDE, N+1, N+1);
@@ -83,8 +107,6 @@ int main(int argc, char **argv){
         MatSeqAIJSetPreallocation(A, 3, NULL);
 
         PetscInt        rstart, rend, M, m;
-	PetscScalar     kk;
-	kk = k*deltat/density/c/deltax/deltax;
         MatGetOwnershipRange(A, &rstart, &rend);
         MatGetSize(A, &M, &m);
         for (PetscInt i=rstart; i<rend; i++) {
@@ -100,14 +122,20 @@ int main(int argc, char **argv){
                         MatSetValues(A, 1, &i, 3, index, value, INSERT_VALUES);
                 }
         }
+	if(heat_flux==1){
 	MatSetValue(A,0,0,100,INSERT_VALUES);
 	MatSetValue(A,0,1,0,INSERT_VALUES);
 	MatSetValue(A,N,N,1,INSERT_VALUES);
 	MatSetValue(A,N,N-1,-1,INSERT_VALUES);
-
+	}
+	if(heat_flux==0){
+        MatSetValue(A,0,0,100,INSERT_VALUES);
+        MatSetValue(A,0,1,0,INSERT_VALUES);
+        MatSetValue(A,N,N,1,INSERT_VALUES);
+        MatSetValue(A,N,N-1,0,INSERT_VALUES);
+        }
         MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY);
         MatAssemblyEnd(A, MAT_FINAL_ASSEMBLY);
-
         MatView(A, PETSC_VIEWER_STDOUT_WORLD);
         MatSetOption(A, MAT_SYMMETRIC, PETSC_TRUE);
 
@@ -122,8 +150,6 @@ int main(int argc, char **argv){
 	VecSetType(uu_new,VECMPI);
 	VecSet(uu, 0.0);
 	//set the initial values at t=0
-	PetscInt          N1;
-	N1 = N-1;
 	PetscScalar       temp;
 	temp = 0.0;
 	for (ii=0; ii<(N+1); ii++) {
@@ -140,7 +166,6 @@ int main(int argc, char **argv){
 			VecSetValue(uu,ii,temp,INSERT_VALUES);
                 }
         }
-
 	VecAssemblyBegin(uu);
         VecAssemblyEnd(uu);
 	//verify the vector uu
@@ -157,8 +182,7 @@ int main(int argc, char **argv){
         VecAssemblyBegin(uu_new);
         VecAssemblyEnd(uu_new);
 	
-
-	//KSP
+	//KSP set
 	KSPCreate(comm, &ksp);
 	KSPSetType(ksp,KSPCG);
 	KSPSetFromOptions(ksp);
@@ -167,12 +191,13 @@ int main(int argc, char **argv){
         KSPSetTolerances(ksp, 1.e-6, PETSC_DEFAULT, PETSC_DEFAULT, PETSC_DEFAULT);
 	KSPSetOperators(ksp, A, A);
 
-	//solve
+	//solve core
 	PetscInt       its = 0;
 	//Explict
 	if (choice == 0){
 		PetscScalar      value3,value4,temp1,temp2;
-		value3 = f*deltat/density/c;
+		value3 = deltat/density/c;
+		VecScale(f,value3);
 		value4 = k*deltat/density/c/deltax/deltax;
 		temp1 = 0.0;
 		temp2 = 0.0;
@@ -185,12 +210,18 @@ int main(int argc, char **argv){
 			VecGetValues(uu,1,&ii,&temp);
 			VecGetValues(uu,1,&value5,&temp1);
 			VecGetValues(uu,1,&value6,&temp2);
+			VecGetValues(f,1,&ii,&value3);
 			temp = temp+value3+value4*(temp1-2*temp+temp2);
 			VecSetValue(uu_new,ii,temp,INSERT_VALUES);
 		}
-                VecGetValues(uu_new,1,&N1,&temp);
-		temp = temp+h*deltax/k;
-		VecSetValue(uu_new,N,temp,INSERT_VALUES);
+		if(heat_flux==1){
+                	VecGetValues(uu_new,1,&N1,&temp);
+			temp = temp+h*deltax/k;
+			VecSetValue(uu_new,N,temp,INSERT_VALUES);
+		}
+		if(heat_flux==0){
+			VecSetValue(uu_new,N,0,INSERT_VALUES);
+		}
                 PetscPrintf(comm,"\nAt time %g, the temperature distribution is\n",(double)((its+1)*deltat));
                 for(jj=0;jj<N+1;jj++){
                         VecGetValues(uu_new,1,&jj,&print);
@@ -201,21 +232,31 @@ int main(int argc, char **argv){
         }
         }
 
+
 	//solve implict
 	if (choice == 1){
-		PetscScalar    value1,value2;
+		PetscScalar    value1,value2,temp3,temp4;
         	value1 = h*deltax/k;
-        	value2 = f*deltat/density/c;
+        	value2 = deltat/density/c;
+		VecScale(f,value2);
+		temp3 = 0;
+		temp4 = 0;
 	while(its<n){
-		VecShift(uu,value2);//transfer f from left to right
+		VecAXPY(uu,1,f);//transfer f from left to right
 		VecSetValues(uu,1,&N,&value1,INSERT_VALUES);
 		VecSetValue(uu,0,g/100,INSERT_VALUES);
+		if(heat_flux==0){
+			VecSetValue(uu,N,0,INSERT_VALUES);
+		}
 		//PetscPrintf(comm,"\nvector u is\n");
                 //for(jj=0;jj<N+1;jj++){
                 //        VecGetValues(uu,1,&jj,&print);
                 //        PetscPrintf(comm,"%g\t",print);
 		//}
 		KSPSolve(ksp,uu,uu_new);
+		VecGetValues(uu,1,&Nh,&temp3);
+		VecGetValues(uu,1,&Nh,&temp4);
+		diff = abs(temp3-temp4);
 		PetscPrintf(comm,"\nAt time %g, the temperature distribution is\n %g\t",(double)((its+1)*deltat),g);
 		for(jj=1;jj<N+1;jj++){
 			VecGetValues(uu_new,1,&jj,&print);
@@ -225,6 +266,8 @@ int main(int argc, char **argv){
 		its++;
 	}
 	}
+
+	PetscPrintf(comm,"\n\n");
 
 	//destroy
 	KSPDestroy(&ksp);
