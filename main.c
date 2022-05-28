@@ -1,6 +1,5 @@
-static char help[] = "Hello world!\n\n";
-#include <stdio.h>
-#include <stdlib.h>
+static char help[] = "Sove one-dimensional transient problem\n\n";
+
 #include "petscksp.h"
 #include <petscvec.h>
 #include "petscmat.h"
@@ -13,8 +12,8 @@ int main(int argc, char **argv){
 	PC              pc;
 	PetscInt        ii=0,jj=0,N=10,N1,Nh,Na,n=10;
         PetscScalar     deltax=0.1,deltat=0.1,L=1,T=1,density = 1.0, c = 1.0,l=1.0,k=1.0,h=1.0,g=0;
-	PetscInt        choice = 1,heat_flux = 0;
-	PetscScalar     diff,print;
+	PetscInt        implict = 1,heat_flux = 0;
+	PetscScalar     temp,print;
 
 	// initialization
 	PetscInitialize(&argc, &argv, (char*)0, help);
@@ -25,7 +24,7 @@ int main(int argc, char **argv){
 	PetscOptionsGetInt(PETSC_NULL, PETSC_NULL, "-time_num", &n, PETSC_NULL);
 	PetscOptionsGetInt(PETSC_NULL, PETSC_NULL, "-num1", &ii, PETSC_NULL);
         PetscOptionsGetInt(PETSC_NULL, PETSC_NULL, "-num2", &jj, PETSC_NULL);
-	PetscOptionsGetInt(PETSC_NULL, PETSC_NULL, "-choice", &choice, PETSC_NULL);//explict=0;implict=1
+	PetscOptionsGetInt(PETSC_NULL, PETSC_NULL, "-implict", &implict, PETSC_NULL);//explict=0;implict=1
 	PetscOptionsGetInt(PETSC_NULL, PETSC_NULL, "-heat_flux", &heat_flux, PETSC_NULL);//constTEM=0;heatflux=1
 	PetscOptionsGetScalar(PETSC_NULL, PETSC_NULL, "-length", &L, PETSC_NULL);
         PetscOptionsGetScalar(PETSC_NULL, PETSC_NULL, "-time", &T, PETSC_NULL);
@@ -44,63 +43,52 @@ int main(int argc, char **argv){
 	//generate vector	
 	//space
 	VecCreate(comm, &x);
-        VecSetSizes(x, PETSC_DECIDE, N+1);
-	//VecSetType(x,VECMPI);
+        VecSetSizes(x, PETSC_DECIDE, Na);
         VecSetFromOptions(x);
-	VecSet(x, 0.0);
-	for (ii=0;ii<Na;ii++){
-		VecSetValue(x, ii, ii*deltax, INSERT_VALUES);
-	}
-	VecAssemblyBegin(x);
-        VecAssemblyEnd(x);
-	//verify the grid x
-	PetscPrintf(comm,"\nThe Vector x is: ");
-	for (ii=0;ii<Na;ii++){
-                VecGetValues(x,1,&ii,&print);
-		PetscPrintf(comm,"%g\t",print);
+	VecSet(x, 1.0);
+	PetscInt   istart,iend;
+        VecGetOwnershipRange(x,&istart,&iend);
+        for (ii=istart; ii<iend; ii++) {
+                temp = (PetscScalar)(ii*deltax);
+                VecSetValues(x,1,&ii,&temp,INSERT_VALUES);
         }
+        VecAssemblyBegin(x);
+        VecAssemblyEnd(x);
+	//VecView(x,PETSC_VIEWER_STDOUT_WORLD);
 
 	//time
 	VecCreate(comm, &t);
         VecSetSizes(t, PETSC_DECIDE, n+1);
-	//VecSetType(t,VECMPI);
         VecSetFromOptions(t);
 	VecSet(t, 0.0);
-        for (ii=0;ii<(n+1);ii++){
-                VecSetValue(t, ii, ii*deltat, INSERT_VALUES);
+        VecGetOwnershipRange(t,&istart,&iend);
+        for (ii=istart; ii<iend; ii++) {
+                temp = (PetscScalar)(ii*deltat);
+                VecSetValues(t,1,&ii,&temp,INSERT_VALUES);
         }
-	VecAssemblyBegin(t);
+        VecAssemblyBegin(t);
         VecAssemblyEnd(t);
-	//verify the grid t
-        PetscPrintf(comm,"\nThe Vector t is: ");
-	for (ii=0;ii<(n+1);ii++){
-                VecGetValues(t,1,&ii,&print);
-                PetscPrintf(comm,"%g\t",print);
-        }
+        //VecView(t,PETSC_VIEWER_STDOUT_WORLD);
 
 
 	//heat supply
         VecCreate(comm, &f);
-        VecSetSizes(f, PETSC_DECIDE, N+1);
-        //VecSetType(f,VECMPI);
+        VecSetSizes(f, PETSC_DECIDE, Na);
         VecSetFromOptions(f);
         VecSet(f, 0.0);
-        for (ii=0;ii<Na;ii++){
-                VecSetValue(f, ii, sin(l*3.1415*ii*deltax), INSERT_VALUES);
+        VecGetOwnershipRange(f,&istart,&iend);
+        for (ii=istart; ii<iend; ii++) {
+                temp = (PetscScalar)(sin(l*3.1415*ii*deltax));
+                VecSetValues(f,1,&ii,&temp,INSERT_VALUES);
         }
         VecAssemblyBegin(f);
         VecAssemblyEnd(f);
-        //verify the grid f
-        PetscPrintf(comm,"\nThe Vector f is: ");
-        for (ii=0;ii<Na;ii++){
-                VecGetValues(f,1,&ii,&print);
-                PetscPrintf(comm,"%g\t",print);
-        }
+        //VecView(f,PETSC_VIEWER_STDOUT_WORLD);
 
 
 	//generate matrix A
 	MatCreate(comm, &A);
-        MatSetSizes(A, PETSC_DECIDE, PETSC_DECIDE, N+1, N+1);
+        MatSetSizes(A, PETSC_DECIDE, PETSC_DECIDE, Na, Na);
 	MatSetType(A,MATMPIAIJ);
         MatSetFromOptions(A);
         MatMPIAIJSetPreallocation(A, 3, NULL, 3, NULL);
@@ -136,48 +124,37 @@ int main(int argc, char **argv){
         }
         MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY);
         MatAssemblyEnd(A, MAT_FINAL_ASSEMBLY);
-        MatView(A, PETSC_VIEWER_STDOUT_WORLD);
+        //MatView(A, PETSC_VIEWER_STDOUT_WORLD);
         MatSetOption(A, MAT_SYMMETRIC, PETSC_TRUE);
 
 
 	//generate vector uu uu_new
 	VecCreate       (comm,&uu);
 	VecCreate       (comm,&uu_new);
-        VecSetSizes(uu, PETSC_DECIDE, (N+1));
-	//VecSetType(uu,VECMPI);
+        VecSetSizes(uu, PETSC_DECIDE, Na);
         VecSetFromOptions(uu);
         VecDuplicate(uu, &uu_new);
-	VecSetType(uu_new,VECMPI);
 	VecSet(uu, 0.0);
 	//set the initial values at t=0
-	PetscScalar       temp;
 	temp = 0.0;
-	for (ii=0; ii<(N+1); ii++) {
+	VecGetOwnershipRange(t,&istart,&iend);
+        for (ii=istart; ii<iend; ii++) {
                 if (ii == 0) {
-                        VecSetValue(uu,ii,g/100,INSERT_VALUES);
-		}
-		else if (ii<N){
-			temp = exp(ii*deltax);
-			VecSetValue(uu,ii,temp,INSERT_VALUES);
-		}
+                        VecSetValues(uu,1,&ii,&g,INSERT_VALUES);
+                }
+                else if (ii<N){
+                        temp = exp(ii*deltax);
+                        VecSetValues(uu,1,&ii,&temp,INSERT_VALUES);
+                }
                 else {
                         VecGetValues(uu,1,&N1,&temp);// heat flux
-			temp = temp + h*deltax/k;
-			VecSetValue(uu,ii,temp,INSERT_VALUES);
+                        temp = temp + h*deltax/k;
+                        VecSetValues(uu,1,&ii,&temp,INSERT_VALUES);
                 }
         }
-	VecAssemblyBegin(uu);
+        VecAssemblyBegin(uu);
         VecAssemblyEnd(uu);
-	//verify the vector uu
-	//PetscPrintf(comm,"\nThe Vector uu is: ");
-        //for (ii=0;ii<(N+1);ii++){
-	//	if(ii=0){
-	//		PetscPrintf(comm,"%g\t",g);
-	//	}else{
-        //        VecGetValues(uu,1,&ii,&print);
-        //        PetscPrintf(comm,"%g\t",print);
-        //}
-	//}
+        //VecView(uu,PETSC_VIEWER_STDOUT_WORLD);
         VecSet(uu_new, 0.0);
         VecAssemblyBegin(uu_new);
         VecAssemblyEnd(uu_new);
@@ -194,7 +171,7 @@ int main(int argc, char **argv){
 	//solve core
 	PetscInt       its = 0;
 	//Explict
-	if (choice == 0){
+	if (implict == 0){
 		PetscScalar      value3,value4,temp1,temp2;
 		value3 = deltat/density/c;
 		VecScale(f,value3);
@@ -234,7 +211,7 @@ int main(int argc, char **argv){
 
 
 	//solve implict
-	if (choice == 1){
+	if (implict == 1){
 		PetscScalar    value1,value2,temp3,temp4;
         	value1 = h*deltax/k;
         	value2 = deltat/density/c;
@@ -244,24 +221,18 @@ int main(int argc, char **argv){
 	while(its<n){
 		VecAXPY(uu,1,f);//transfer f from left to right
 		VecSetValues(uu,1,&N,&value1,INSERT_VALUES);
-		VecSetValue(uu,0,g/100,INSERT_VALUES);
-		if(heat_flux==0){
-			VecSetValue(uu,N,0,INSERT_VALUES);
-		}
-		//PetscPrintf(comm,"\nvector u is\n");
-                //for(jj=0;jj<N+1;jj++){
-                //        VecGetValues(uu,1,&jj,&print);
-                //        PetscPrintf(comm,"%g\t",print);
-		//}
+		temp = g;
+                val = 0;
+		VecSetValues(uu,1,&val,&temp,INSERT_VALUES);
+                if(heat_flux==0){
+                        temp = 0;
+                        VecSetValues(uu,1,&N,&temp,INSERT_VALUES);
+                }
+                VecAssemblyBegin(uu);
+                VecAssemblyEnd(uu);
 		KSPSolve(ksp,uu,uu_new);
-		VecGetValues(uu,1,&Nh,&temp3);
-		VecGetValues(uu,1,&Nh,&temp4);
-		diff = abs(temp3-temp4);
-		PetscPrintf(comm,"\nAt time %g, the temperature distribution is\n %g\t",(double)((its+1)*deltat),g);
-		for(jj=1;jj<N+1;jj++){
-			VecGetValues(uu_new,1,&jj,&print);
-                        PetscPrintf(comm,"%g\t",print);
-		}
+		PetscPrintf(comm,"\nAt time %g:\n",(double)((its+1)*deltat));
+                VecView(uu_new,PETSC_VIEWER_STDOUT_WORLD);
 		VecCopy(uu_new,uu);
 		its++;
 	}
