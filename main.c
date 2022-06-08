@@ -228,6 +228,11 @@ int main(int argc, char **argv){
 		temp3 = 0;
 		temp4 = 0;
 	while(its<n){
+		if(dt/dx>=0.5){
+                        PetscPrintf(comm,"\nThe dx and dt cannot give a satisfied solution.\n";
+			break;
+                }
+                else{
 		VecAXPY(uu,1,f);//transfer f from left to right
 		VecSetValues(uu,1,&N,&value1,INSERT_VALUES);
 		temp = 100*g;
@@ -244,6 +249,7 @@ int main(int argc, char **argv){
                 VecView(uu_new,PETSC_VIEWER_STDOUT_WORLD);
 		VecCopy(uu_new,uu);
 		its++;
+	}
 	}
 	}
 
