@@ -110,6 +110,8 @@ int main(int argc, char **argv){
                         MatSetValues(A, 1, &i, 3, index, value, INSERT_VALUES);
                 }
         }
+	MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY);
+        MatAssemblyEnd(A, MAT_FINAL_ASSEMBLY);
 	if(heat_flux==1){
 	MatSetValue(A,0,0,100,INSERT_VALUES);
 	MatSetValue(A,0,1,0,INSERT_VALUES);
@@ -137,20 +139,27 @@ int main(int argc, char **argv){
 	VecSet(uu, 0.0);
 	//set the initial values at t=0
 	temp = 0.0;
-	VecGetOwnershipRange(t,&istart,&iend);
+	VecGetOwnershipRange(uu,&istart,&iend);
         for (ii=istart; ii<iend; ii++) {
                 if (ii == 0) {
                         VecSetValues(uu,1,&ii,&g,INSERT_VALUES);
                 }
-                else if (ii<N){
+                else{
                         temp = exp(ii*deltax);
                         VecSetValues(uu,1,&ii,&temp,INSERT_VALUES);
                 }
-                else {
-                        VecGetValues(uu,1,&N1,&temp);// heat flux
-                        temp = temp + h*deltax/k;
-                        VecSetValues(uu,1,&ii,&temp,INSERT_VALUES);
-                }
+
+        }
+        VecAssemblyBegin(uu);
+        VecAssemblyEnd(uu);
+        if (heat_flux==0){
+                temp = 0;
+                VecSetValues(uu,1,&N,&temp,INSERT_VALUES);
+        }
+	if (heat_flux==1){
+                VecGetValues(uu,1,&N1,&temp);// heat flux
+                temp = temp + h*deltax/k;
+                VecSetValues(uu,1,&N,&temp,INSERT_VALUES);
         }
         VecAssemblyBegin(uu);
         VecAssemblyEnd(uu);
@@ -221,7 +230,7 @@ int main(int argc, char **argv){
 	while(its<n){
 		VecAXPY(uu,1,f);//transfer f from left to right
 		VecSetValues(uu,1,&N,&value1,INSERT_VALUES);
-		temp = g;
+		temp = 100*g;
                 val = 0;
 		VecSetValues(uu,1,&val,&temp,INSERT_VALUES);
                 if(heat_flux==0){
