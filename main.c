@@ -10,8 +10,8 @@ int main(int argc, char **argv){
         Mat             A,U;
 	KSP             ksp;
 	PC              pc;
-	PetscInt        ii=0,jj=0,N=10,N1,Nh,Na,n=10;
-        PetscScalar     deltax=0.1,deltat=0.1,L=1,T=1,density = 1.0, c = 1.0,l=1.0,k=1.0,h=1.0,g=0;
+	PetscInt        ii=0,jj=0,N=100,N1,Nh,Na,n=100;
+        PetscScalar     deltax=0.01,deltat=0.01,L=1,T=1,density = 1.0, c = 1.0,l=1.0,k=1.0,h=1.0,g=0;
 	PetscInt        implict = 1,heat_flux = 0;
 	PetscScalar     temp,print;
 
@@ -230,7 +230,7 @@ int main(int argc, char **argv){
 	while(its<n){
 		if(dt/dx>=0.5){
                         PetscPrintf(comm,"\nThe dx and dt cannot give a satisfied solution.\n";
-			break;
+			//break;
                 }
                 else{
 		VecAXPY(uu,1,f);//transfer f from left to right
@@ -247,6 +247,9 @@ int main(int argc, char **argv){
 		KSPSolve(ksp,uu,uu_new);
 		PetscPrintf(comm,"\nAt time %g:\n",(double)((its+1)*deltat));
                 VecView(uu_new,PETSC_VIEWER_STDOUT_WORLD);
+		
+		//steady state
+		if (abs(VecAbs(uu)-VecAbs(uu_new<1*e^-6))){break;}
 		VecCopy(uu_new,uu);
 		its++;
 	}
