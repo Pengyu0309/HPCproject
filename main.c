@@ -10,7 +10,9 @@ int main(int argc, char **argv){
         Vec             x, t,uu,uu_exact,uu_new,f,duu;
         Mat             A,U;
 	KSP             ksp;
+	KSPType         type = KSPCG;
 	PC              pc;
+	PCType          pctype = PCJACOBI;
 	PetscInt        ii=0,jj=0,N=100,N1,Nh,Na,n=1000;
         PetscScalar     deltax=0.01,deltat=0.1,L=1,T=100,density = 1.0, c = 1.0,l=1.0,k=1.0,h=1.0,g=0;
 	PetscInt        implict = 1,heat_flux = 0,val,*idx;
@@ -39,6 +41,7 @@ int main(int argc, char **argv){
 	PetscOptionsGetScalar(PETSC_NULL, PETSC_NULL, "-boundary_temperature", &g, PETSC_NULL);//temperature
 	PetscOptionsGetScalar(PETSC_NULL, PETSC_NULL, "-delta_x", &deltax, PETSC_NULL);
 	PetscOptionsGetScalar(PETSC_NULL, PETSC_NULL, "-delta_t", &deltat, PETSC_NULL);
+	
 	
 	N1 = N-1;
 	Nh = N/2;
@@ -98,6 +101,7 @@ int main(int argc, char **argv){
         MatSeqAIJSetPreallocation(A, 3, NULL);
 
 	PetscGetCPUTime(&t1);
+	for(ii=0;ii<10000;ii++){
         PetscInt        rstart, rend, M, m;
         MatGetOwnershipRange(A, &rstart, &rend);
         MatGetSize(A, &M, &m);
@@ -147,6 +151,7 @@ int main(int argc, char **argv){
         }
         MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY);
         MatAssemblyEnd(A, MAT_FINAL_ASSEMBLY);
+	}
 	PetscGetCPUTime(&t2);
         //MatView(A, PETSC_VIEWER_STDOUT_WORLD);
         MatSetOption(A, MAT_SYMMETRIC, PETSC_TRUE);
@@ -220,10 +225,10 @@ int main(int argc, char **argv){
 
 	//KSP set
 	KSPCreate(comm, &ksp);
-	KSPSetType(ksp,KSPCG);
+	KSPSetType(ksp,type);
 	KSPSetFromOptions(ksp);
 	KSPGetPC(ksp, &pc);
-        PCSetType(pc, PCJACOBI);
+        PCSetType(pc, pctype);
         KSPSetTolerances(ksp, 1.e-6, PETSC_DEFAULT, PETSC_DEFAULT, PETSC_DEFAULT);
 	KSPSetOperators(ksp, A, A);
 
@@ -241,6 +246,8 @@ int main(int argc, char **argv){
                         PetscPrintf(comm,"\nThe dx and dt cannot give a satisfied solution.\n");
                         //break;
                 }
+		PetscGetCPUTime(&t3);
+		for(ii=0;ii<10000;ii++){
         while(its<n && err>tol){
 		VecCopy(uu,duu);
 		MatMult(A,uu,uu_new);
@@ -273,7 +280,8 @@ int main(int argc, char **argv){
                 VecMax(uu_new,idx, &err);
 
                 its++;
-        }
+        }}
+	PetscGetCPUTime(&t4);
         }
 
 

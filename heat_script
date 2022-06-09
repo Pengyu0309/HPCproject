@@ -1,0 +1,54 @@
+#!/bin/bash
+#BSUB -J petsc-test
+#BSUB -q ser
+#BSUB -n 20
+#BSUB -e %J-petsc.err
+#BSUB -o %J-petsc.out
+
+module purge
+module load intel/2018.4
+module load mpi/intel/2018.4
+
+#mpirun -np 20   ./heat.out -space_num 100 -delta_x 0.01 -time_num 1000000 -delta_t 0.000001  -log_view >  heat_em_cx_1e-6.log   2>&1
+#mpirun -np 20   ./heat.out -space_num 100 -delta_x 0.01 -time_num 200000 -delta_t 0.000005  -log_view >  heat_em_cx_5e-6.log   2>&1
+#mpirun -np 20   ./heat.out -space_num 100 -delta_x 0.01 -time_num 100000 -delta_t 0.00001  -log_view >  heat_em_cx_1e-5.log   2>&1
+#mpirun -np 20   ./heat.out -space_num 100 -delta_x 0.01 -time_num 20000 -delta_t 0.00005  -log_view >  heat_em_cx_5e-5.log   2>&1
+#mpirun -np 20   ./heat.out -space_num 100 -delta_x 0.01 -time_num 2000000 -delta_t 0.0000005  -log_view > heat_em_cx_5e-7.log   2>&1
+
+#mpirun -np 20   ./heat.out -space_num 100 -delta_x 0.01 -time_num 2000000 -delta_t 0.0000005  -log_view > heat_em_ct_0p01.log   2>&1
+#mpirun -np 20   ./heat.out -space_num 50 -delta_x 0.02 -time_num 2000000 -delta_t 0.0000005  -log_view >  heat_em_ct_0p02.log   2>&1
+#mpirun -np 20   ./heat.out -space_num 25 -delta_x 0.04 -time_num 2000000 -delta_t 0.0000005  -log_view >  heat_em_ct_0p04.log   2>&1
+#mpirun -np 20   ./heat.out -space_num 1000 -delta_x 0.001 -time_num 2000000 -delta_t 0.0000005  -log_view > heat_em_ct_0p001.log   2>&1
+#mpirun -np 20   ./heat.out -space_num 200 -delta_x 0.005 -time_num 2000000 -delta_t 0.0000005  -log_view >  heat_em_ct_0p005.log   2>&1
+
+#mpirun -np 1   ./heat.out -space_num 10000 -delta_x 0.0001 -time_num 100000 -delta_t 0.0000001  -log_view >  heat_im_fixsize_1.log   2>&1
+#mpirun -np 2   ./heat.out -space_num 10000 -delta_x 0.0001 -time_num 100000 -delta_t 0.0000001  -log_view >  heat_im_fixsize_2.log   2>&1
+#mpirun -np 4   ./heat.out -space_num 10000 -delta_x 0.0001 -time_num 100000 -delta_t 0.0000001  -log_view >  heat_im_fixsize_4.log   2>&1
+#mpirun -np 8   ./heat.out -space_num 10000 -delta_x 0.0001 -time_num 100000 -delta_t 0.0000001  -log_view >  heat_im_fixsize_8.log   2>&1
+#mpirun -np 16   ./heat.out -space_num 10000 -delta_x 0.0001 -time_num 100000 -delta_t 0.0000001  -log_view >  heat_im_fixsize_16.log   2>&1
+#mpirun -np 20   ./heat.out -space_num 10000 -delta_x 0.0001 -time_num 100000 -delta_t 0.0000001  -log_view >  heat_im_fixsize_20.log   2>&1
+
+#mpirun -np 1   ./heat.out -space_num 10000 -delta_x 0.0001 -time_num 100000 -delta_t 0.00001  -log_view >  heat_im_scal_1.log   2>&1
+#mpirun -np 2   ./heat.out -space_num 20000 -delta_x 0.00005 -time_num 100000 -delta_t 0.00001  -log_view >  heat_im_scal_2.log   2>&1
+#mpirun -np 4   ./heat.out -space_num 40000 -delta_x 0.000025 -time_num 100000 -delta_t 0.00001  -log_view >  heat_im_scal_4.log   2>&1
+#mpirun -np 8   ./heat.out -space_num 80000 -delta_x 0.0000125 -time_num 100000 -delta_t 0.00001  -log_view >  heat_im_scal_8.log   2>&1
+#mpirun -np 16   ./heat.out -space_num 160000 -delta_x 0.00000625 -time_num 100000 -delta_t 0.00001  -log_view >  heat_im_scal_16.log   2>&1
+
+#mpirun -np 1   ./heat.out -space_num 10000 -delta_x 0.0001 -time_num 100000 -delta_t 0.000000001 -implict 0  -log_view >  heat_em_fixsize_1.log   2>&1
+#mpirun -np 2   ./heat.out -space_num 10000 -delta_x 0.0001 -time_num 100000 -delta_t 0.000000001 -implict 0  -log_view >  heat_em_fixsize_2.log   2>&1
+#mpirun -np 4   ./heat.out -space_num 10000 -delta_x 0.0001 -time_num 100000 -delta_t 0.000000001 -implict 0  -log_view >  heat_em_fixsize_4.log   2>&1
+#mpirun -np 8   ./heat.out -space_num 10000 -delta_x 0.0001 -time_num 100000 -delta_t 0.000000001 -implict 0  -log_view >  heat_em_fixsize_8.log   2>&1
+#mpirun -np 16   ./heat.out -space_num 10000 -delta_x 0.0001 -time_num 100000 -delta_t 0.000000001 -implict 0  -log_view >  heat_em_fixsize_16.log   2>&1
+#mpirun -np 20   ./heat.out -space_num 10000 -delta_x 0.0001 -time_num 100000 -delta_t 0.000000001 -implict 0  -log_view >  heat_em_fixsize_20.log   2>&1
+
+#mpirun -np 1   ./heat.out -space_num 10000 -delta_x 0.0001 -time_num 100000 -delta_t 0.00000000001 -implict 0  -log_view >  heat_em_scal_1.log   2>&1
+#mpirun -np 2   ./heat.out -space_num 20000 -delta_x 0.00005 -time_num 100000 -delta_t 0.00000000001 -implict 0  -log_view >  heat_em_scal_2.log   2>&1
+#mpirun -np 4   ./heat.out -space_num 40000 -delta_x 0.000025 -time_num 100000 -delta_t 0.00000000001 -implict 0  -log_view >  heat_em_scal_4.log   2>&1
+#mpirun -np 8   ./heat.out -space_num 80000 -delta_x 0.0000125 -time_num 100000 -delta_t 0.00000000001 -implict 0  -log_view >  heat_em_scal_8.log   2>&1
+#mpirun -np 16   ./heat.out -space_num 160000 -delta_x 0.00000625 -time_num 100000 -delta_t 0.00000000001 -implict 0  -log_view >  heat_em_scal_16.log   2>&1
+
+mpirun -np 20   ./heat.out -space_num 10000 -delta_x 0.0001 -time_num 100000 -delta_t 0.0000001 -ksp_type cg -pc_type jacobi  -log_view >  heat_im_jac.log   2>&1
+mpirun -np 20   ./heat.out -space_num 10000 -delta_x 0.0001 -time_num 100000 -delta_t 0.0000001 -ksp_type cg -pc_type asm  -log_view >  heat_im_asm.log   2>&1
+mpirun -np 20   ./heat.out -space_num 10000 -delta_x 0.0001 -time_num 100000 -delta_t 0.0000001 -ksp_type cg -pc_type -pc_type lu -pc_factor_mat_solver_type mumps  -log_view >  heat_im_lu.log   2>&1
+
+
