@@ -6,15 +6,15 @@ static char help[] = "Solve one-dimensional transient problem\n\n";
 
 int main(int argc, char **argv){
 	MPI_Comm        comm;
-        Vec             x, t,uu,uu_new,f,duu;
+        Vec             x, t,uu,uu_exact,uu_new,f,duu;
         Mat             A,U;
 	KSP             ksp;
 	PC              pc;
 	PetscInt        ii=0,jj=0,N=100,N1,Nh,Na,n=1000;
         PetscScalar     deltax=0.01,deltat=0.1,L=1,T=100,density = 1.0, c = 1.0,l=1.0,k=1.0,h=1.0,g=0;
-	PetscInt        implict = 1,heat_flux = 0,val;
+	PetscInt        implict = 1,heat_flux = 0,val,*idx;
 	PetscScalar     temp,print;
-	PetscReal       err=1,tol = 1.e-8,Norm=0;
+	PetscReal       err=1,tol = 1.e-8,Norm=0,pi=3.14159265359;
 
 	// initialization
 	PetscInitialize(&argc, &argv, (char*)0, help);
@@ -79,7 +79,7 @@ int main(int argc, char **argv){
         VecSet(f, 0.0);
         VecGetOwnershipRange(f,&istart,&iend);
         for (ii=istart; ii<iend; ii++) {
-                temp = (PetscScalar)(sin(l*3.1415*ii*deltax));
+                temp = (PetscScalar)(sin(l*pi*ii*deltax));
                 VecSetValues(f,1,&ii,&temp,INSERT_VALUES);
         }
         VecAssemblyBegin(f);
@@ -190,6 +190,30 @@ int main(int argc, char **argv){
         VecAssemblyBegin(duu);
         VecAssemblyEnd(duu);
 	
+	//manufactured solution method
+	VecCreate       (comm,&uu_exact);
+	VecSetSizes(uu_exact, PETSC_DECIDE, Na);
+	VecSetFromOptions(uu_exact);
+	VecGetOwnershipRange(uu_exact,&istart,&iend);
+        for (ii=istart; ii<iend; ii++) {
+                if (ii == 0) {
+                        VecSetValues(uu_exact,1,&ii,&g,INSERT_VALUES);
+                }
+                else{
+                        temp = sin(pi*ii*deltax)/k/pi/pi;
+                        VecSetValues(uu_exact,1,&ii,&temp,INSERT_VALUES);
+                }
+
+        }
+	temp = 0;
+	VecSetValues(uu_exact,1,&N,&temp,INSERT_VALUES);
+        VecAssemblyBegin(uu_exact);
+        VecAssemblyEnd(uu_exact);
+	//VecView(uu_exact,PETSC_VIEWER_STDOUT_WORLD);
+
+
+
+
 	//KSP set
 	KSPCreate(comm, &ksp);
 	KSPSetType(ksp,KSPCG);
@@ -236,10 +260,13 @@ int main(int argc, char **argv){
                 //VecView(uu_new,PETSC_VIEWER_STDOUT_WORLD);
                 VecCopy(uu_new,uu);
                 //steady state
-                VecAXPY(uu_new,-1,duu);
-                VecNorm(uu_new,NORM_2,&Norm);
+                //VecAXPY(uu_new,-1,duu);
+                //VecNorm(uu_new,NORM_2,&Norm);
                 //VecView(uu_new,PETSC_VIEWER_STDOUT_WORLD);
-                err = Norm;
+                //err = Norm;
+		VecAXPY(uu_new,-1,uu_exact);
+                VecAbs(uu_new);
+                VecMax(uu_new,idx, &err);
 
                 its++;
         }
@@ -272,19 +299,20 @@ int main(int argc, char **argv){
                 VecView(uu_new,PETSC_VIEWER_STDOUT_WORLD);
 		VecCopy(uu_new,uu);
 		//steady state
-		VecAXPY(uu_new,-1,duu);
-                VecNorm(uu_new,NORM_2,&Norm);
-                VecView(uu_new,PETSC_VIEWER_STDOUT_WORLD);
-                err = Norm;
-
+		//VecAXPY(uu_new,-1,duu);
+                //VecNorm(uu_new,NORM_2,&Norm);
+                //VecView(uu_new,PETSC_VIEWER_STDOUT_WORLD);
+		VecAXPY(uu_new,-1,uu_exact);
+		VecAbs(uu_new);
+		VecMax(uu_new,idx, &err);
 		its++;
 	}
 	}
 	
 	if (its<n){
-	PetscPrintf(comm,"\n\nConverge at time = %g\n\n",(double)(its*deltat));
+	PetscPrintf(comm,"\n\nConverge at time = %g\nThe Error is %g\n",(double)(its*deltat),(double)(err));
 	}else{
-		PetscPrintf(comm,"\n\nNot Converge!! \n\n");
+		PetscPrintf(comm,"\n\nNot Converge!! \nThe error is %g\n",(double)(err));
 	}
 
 	//destroy
@@ -293,6 +321,7 @@ int main(int argc, char **argv){
 	VecDestroy(&t);
 	VecDestroy(&uu);
 	VecDestroy(&uu_new);
+	VecDestroy(&uu_exact);
 	VecDestroy(&duu);
 	MatDestroy(&A);
 
