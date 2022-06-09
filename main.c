@@ -98,6 +98,7 @@ int main(int argc, char **argv){
         PetscInt        rstart, rend, M, m;
         MatGetOwnershipRange(A, &rstart, &rend);
         MatGetSize(A, &M, &m);
+	if (implict==1){
         for (PetscInt i=rstart; i<rend; i++) {
                 PetscInt    index[3] = {i-1, i, i+1};
                 PetscScalar value[3] = {(-k*deltat/density/c/deltax/deltax), (1+2*k*deltat/density/c/deltax/deltax), (-k*deltat/density/c/deltax/deltax)};
@@ -125,11 +126,26 @@ int main(int argc, char **argv){
         MatSetValue(A,N,N,1,INSERT_VALUES);
         MatSetValue(A,N,N-1,0,INSERT_VALUES);
         }
+	}
+	if (implict==0){
+		for (PetscInt i=rstart; i<rend; i++) {
+                PetscInt    index[3] = {i-1, i, i+1};
+                PetscScalar value[3] = {(k*deltat/density/c/deltax/deltax), (1-2*k*deltat/density/c/deltax/deltax), (k*deltat/density/c/deltax/deltax)};
+                if (i == 0) {
+                        MatSetValues(A, 1, &i, 2, &index[1], &value[1], INSERT_VALUES);
+                }
+                else if (i == m-1) {
+                        MatSetValues(A, 1, &i, 2, index, value, INSERT_VALUES);
+                }
+                else {
+                        MatSetValues(A, 1, &i, 3, index, value, INSERT_VALUES);
+                }
+        }
+        }
         MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY);
         MatAssemblyEnd(A, MAT_FINAL_ASSEMBLY);
         //MatView(A, PETSC_VIEWER_STDOUT_WORLD);
         MatSetOption(A, MAT_SYMMETRIC, PETSC_TRUE);
-
 
 	//generate vector uu uu_new
 	VecCreate       (comm,&uu);
@@ -193,45 +209,39 @@ int main(int argc, char **argv){
 		value4 = k*deltat/density/c/deltax/deltax;
 		temp1 = 0.0;
 		temp2 = 0.0;
-        while(its<n && err>tol){
 		if(deltat/deltax>=0.5){
                         PetscPrintf(comm,"\nThe dx and dt cannot give a satisfied solution.\n");
                         //break;
                 }
+        while(its<n && err>tol){
 		VecCopy(uu,duu);
-                VecSetValue(uu_new,0,g,INSERT_VALUES);
-		for (ii=1;ii<N;ii++){
-			PetscInt  value5, value6;
-			value5 = ii-1;
-			value6 = ii+1;
-			VecGetValues(uu,1,&ii,&temp);
-			VecGetValues(uu,1,&value5,&temp1);
-			VecGetValues(uu,1,&value6,&temp2);
-			VecGetValues(f,1,&ii,&value3);
-			temp = temp+value3+value4*(temp1-2*temp+temp2);
-			VecSetValue(uu_new,ii,temp,INSERT_VALUES);
-		}
+		MatMult(A,uu,uu_new);
+		VecAXPY(uu_new,1,f);
+		val=0;
+		VecSetValues(uu_new,1,&val,&g,INSERT_VALUES);
 		if(heat_flux==1){
-                	VecGetValues(uu_new,1,&N1,&temp);
-			temp = temp+h*deltax/k;
-			VecSetValue(uu_new,N,temp,INSERT_VALUES);
-		}
-		if(heat_flux==0){
-			VecSetValue(uu_new,N,0,INSERT_VALUES);
-		}
-                PetscPrintf(comm,"\nAt time %g, the temperature distribution is\n",(double)((its+1)*deltat));
-                for(jj=0;jj<N+1;jj++){
-                        VecGetValues(uu_new,1,&jj,&print);
-                        PetscPrintf(comm,"%g\t",print);
+                        VecAssemblyBegin(uu_new);
+        		VecAssemblyEnd(uu_new);
+			VecGetValues(uu_new,1,&N1,&temp);
+                        temp = temp+h*deltax/k;
+                        VecSetValues(uu_new,1,&N,&temp,INSERT_VALUES);
                 }
-		VecCopy(uu_new,uu);
-		//steady state
+                if(heat_flux==0){
+                        temp = 0;
+                        VecSetValues(uu_new,1,&N,&temp,INSERT_VALUES);
+                }
+		VecAssemblyBegin(uu_new);
+                VecAssemblyEnd(uu_new);
+		//PetscPrintf(comm,"\nAt time %g, the temperature distribution is\n",(double)((its+1)*deltat));
+                //VecView(uu_new,PETSC_VIEWER_STDOUT_WORLD);
+                VecCopy(uu_new,uu);
+                //steady state
                 VecAXPY(uu_new,-1,duu);
                 VecNorm(uu_new,NORM_2,&Norm);
-                VecView(uu_new,PETSC_VIEWER_STDOUT_WORLD);
+                //VecView(uu_new,PETSC_VIEWER_STDOUT_WORLD);
                 err = Norm;
 
-		its++;
+                its++;
         }
         }
 
