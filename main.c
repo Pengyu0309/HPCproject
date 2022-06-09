@@ -3,6 +3,7 @@ static char help[] = "Solve one-dimensional transient problem\n\n";
 #include "petscksp.h"
 #include <petscvec.h>
 #include "petscmat.h"
+#include <petscsys.h>
 
 int main(int argc, char **argv){
 	MPI_Comm        comm;
@@ -15,6 +16,7 @@ int main(int argc, char **argv){
 	PetscInt        implict = 1,heat_flux = 0,val,*idx;
 	PetscScalar     temp,print;
 	PetscReal       err=1,tol = 1.e-8,Norm=0,pi=3.14159265359;
+	PetscLogDouble  t1, t2, t3, t4;
 
 	// initialization
 	PetscInitialize(&argc, &argv, (char*)0, help);
@@ -95,6 +97,7 @@ int main(int argc, char **argv){
         MatMPIAIJSetPreallocation(A, 3, NULL, 3, NULL);
         MatSeqAIJSetPreallocation(A, 3, NULL);
 
+	PetscGetCPUTime(&t1);
         PetscInt        rstart, rend, M, m;
         MatGetOwnershipRange(A, &rstart, &rend);
         MatGetSize(A, &M, &m);
@@ -144,6 +147,7 @@ int main(int argc, char **argv){
         }
         MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY);
         MatAssemblyEnd(A, MAT_FINAL_ASSEMBLY);
+	PetscGetCPUTime(&t2);
         //MatView(A, PETSC_VIEWER_STDOUT_WORLD);
         MatSetOption(A, MAT_SYMMETRIC, PETSC_TRUE);
 
@@ -281,6 +285,7 @@ int main(int argc, char **argv){
 		VecScale(f,value2);
 		temp3 = 0;
 		temp4 = 0;
+		PetscGetCPUTime(&t3);
 	while(its<n && err>tol){
 		VecCopy(uu,duu);
 		VecAXPY(uu,1,f);//transfer f from left to right
@@ -307,6 +312,7 @@ int main(int argc, char **argv){
 		VecMax(uu_new,idx, &err);
 		its++;
 	}
+	 PetscGetCPUTime(&t4);
 	}
 	
 	if (its<n){
@@ -314,6 +320,8 @@ int main(int argc, char **argv){
 	}else{
 		PetscPrintf(comm,"\n\nNot Converge!! \nThe error is %g\n",(double)(err));
 	}
+
+	PetscPrintf(comm,"\n\nMatrix time:%f \nIteration time: %f\n",t2-t1,t4-t3);
 
 	//destroy
 	KSPDestroy(&ksp);
