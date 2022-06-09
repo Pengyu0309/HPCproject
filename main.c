@@ -101,7 +101,7 @@ int main(int argc, char **argv){
         MatSeqAIJSetPreallocation(A, 3, NULL);
 
 	PetscGetCPUTime(&t1);
-	for(ii=0;ii<10000;ii++){
+	
         PetscInt        rstart, rend, M, m;
         MatGetOwnershipRange(A, &rstart, &rend);
         MatGetSize(A, &M, &m);
@@ -151,7 +151,7 @@ int main(int argc, char **argv){
         }
         MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY);
         MatAssemblyEnd(A, MAT_FINAL_ASSEMBLY);
-	}
+	
 	PetscGetCPUTime(&t2);
         //MatView(A, PETSC_VIEWER_STDOUT_WORLD);
         MatSetOption(A, MAT_SYMMETRIC, PETSC_TRUE);
@@ -242,12 +242,11 @@ int main(int argc, char **argv){
 		value4 = k*deltat/density/c/deltax/deltax;
 		temp1 = 0.0;
 		temp2 = 0.0;
-		if(deltat/deltax>=0.5){
+		if(deltat/deltax/deltax>0.5){
                         PetscPrintf(comm,"\nThe dx and dt cannot give a satisfied solution.\n");
                         //break;
                 }
 		PetscGetCPUTime(&t3);
-		for(ii=0;ii<10000;ii++){
         while(its<n && err>tol){
 		VecCopy(uu,duu);
 		MatMult(A,uu,uu_new);
@@ -280,7 +279,7 @@ int main(int argc, char **argv){
                 VecMax(uu_new,idx, &err);
 
                 its++;
-        }}
+        }
 	PetscGetCPUTime(&t4);
         }
 
@@ -324,7 +323,7 @@ int main(int argc, char **argv){
 	}
 	
 	if (its<n){
-	PetscPrintf(comm,"\n\nConverge at time = %g\nThe Error is %g\n",(double)(its*deltat),(double)(err));
+		PetscPrintf(comm,"\n\nConverge at time = %g\nThe Error is %g\n",(double)(its*deltat),(double)(err));
 	}else{
 		PetscPrintf(comm,"\n\nNot Converge!! \nThe error is %g\n",(double)(err));
 	}
