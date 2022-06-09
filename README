@@ -1,1 +1,3 @@
 This is a git of HPC
+You should run "make heat.out" after finishing the code, and edit the job script "heat_script", then submit the script.
+You can choose the Explicit or implicit method by define "implict=1 or 0", and different boundary condition also can be defined by choose "heat_flux = 1 or 0".
