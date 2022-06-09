@@ -1,4 +1,4 @@
-static char help[] = "Sove one-dimensional transient problem\n\n";
+static char help[] = "Solve one-dimensional transient problem\n\n";
 
 #include "petscksp.h"
 #include <petscvec.h>
@@ -6,14 +6,15 @@ static char help[] = "Sove one-dimensional transient problem\n\n";
 
 int main(int argc, char **argv){
 	MPI_Comm        comm;
-        Vec             x, t,uu,uu_new,f;
+        Vec             x, t,uu,uu_new,f,duu;
         Mat             A,U;
 	KSP             ksp;
 	PC              pc;
-	PetscInt        ii=0,jj=0,N=100,N1,Nh,Na,n=100;
-        PetscScalar     deltax=0.01,deltat=0.01,L=1,T=1,density = 1.0, c = 1.0,l=1.0,k=1.0,h=1.0,g=0;
-	PetscInt        implict = 1,heat_flux = 0;
+	PetscInt        ii=0,jj=0,N=100,N1,Nh,Na,n=1000;
+        PetscScalar     deltax=0.01,deltat=0.1,L=1,T=100,density = 1.0, c = 1.0,l=1.0,k=1.0,h=1.0,g=0;
+	PetscInt        implict = 1,heat_flux = 0,val;
 	PetscScalar     temp,print;
+	PetscReal       err=1,tol = 1.e-8,Norm=0;
 
 	// initialization
 	PetscInitialize(&argc, &argv, (char*)0, help);
@@ -133,9 +134,11 @@ int main(int argc, char **argv){
 	//generate vector uu uu_new
 	VecCreate       (comm,&uu);
 	VecCreate       (comm,&uu_new);
+	VecCreate       (comm,&duu);
         VecSetSizes(uu, PETSC_DECIDE, Na);
         VecSetFromOptions(uu);
         VecDuplicate(uu, &uu_new);
+	VecDuplicate(uu, &duu);
 	VecSet(uu, 0.0);
 	//set the initial values at t=0
 	temp = 0.0;
@@ -167,6 +170,9 @@ int main(int argc, char **argv){
         VecSet(uu_new, 0.0);
         VecAssemblyBegin(uu_new);
         VecAssemblyEnd(uu_new);
+	VecSet(duu, 0.0);
+        VecAssemblyBegin(duu);
+        VecAssemblyEnd(duu);
 	
 	//KSP set
 	KSPCreate(comm, &ksp);
@@ -187,7 +193,12 @@ int main(int argc, char **argv){
 		value4 = k*deltat/density/c/deltax/deltax;
 		temp1 = 0.0;
 		temp2 = 0.0;
-        while(its<n){
+        while(its<n && err>tol){
+		if(deltat/deltax>=0.5){
+                        PetscPrintf(comm,"\nThe dx and dt cannot give a satisfied solution.\n");
+                        //break;
+                }
+		VecCopy(uu,duu);
                 VecSetValue(uu_new,0,g,INSERT_VALUES);
 		for (ii=1;ii<N;ii++){
 			PetscInt  value5, value6;
@@ -214,6 +225,12 @@ int main(int argc, char **argv){
                         PetscPrintf(comm,"%g\t",print);
                 }
 		VecCopy(uu_new,uu);
+		//steady state
+                VecAXPY(uu_new,-1,duu);
+                VecNorm(uu_new,NORM_2,&Norm);
+                VecView(uu_new,PETSC_VIEWER_STDOUT_WORLD);
+                err = Norm;
+
 		its++;
         }
         }
@@ -227,12 +244,8 @@ int main(int argc, char **argv){
 		VecScale(f,value2);
 		temp3 = 0;
 		temp4 = 0;
-	while(its<n){
-		if(dt/dx>=0.5){
-                        PetscPrintf(comm,"\nThe dx and dt cannot give a satisfied solution.\n";
-			//break;
-                }
-                else{
+	while(its<n && err>tol){
+		VecCopy(uu,duu);
 		VecAXPY(uu,1,f);//transfer f from left to right
 		VecSetValues(uu,1,&N,&value1,INSERT_VALUES);
 		temp = 100*g;
@@ -247,16 +260,22 @@ int main(int argc, char **argv){
 		KSPSolve(ksp,uu,uu_new);
 		PetscPrintf(comm,"\nAt time %g:\n",(double)((its+1)*deltat));
                 VecView(uu_new,PETSC_VIEWER_STDOUT_WORLD);
-		
-		//steady state
-		if (abs(VecAbs(uu)-VecAbs(uu_new<1*e^-6))){break;}
 		VecCopy(uu_new,uu);
+		//steady state
+		VecAXPY(uu_new,-1,duu);
+                VecNorm(uu_new,NORM_2,&Norm);
+                VecView(uu_new,PETSC_VIEWER_STDOUT_WORLD);
+                err = Norm;
+
 		its++;
 	}
 	}
+	
+	if (its<n){
+	PetscPrintf(comm,"\n\nConverge at time = %g\n\n",(double)(its*deltat));
+	}else{
+		PetscPrintf(comm,"\n\nNot Converge!! \n\n");
 	}
-
-	PetscPrintf(comm,"\n\n");
 
 	//destroy
 	KSPDestroy(&ksp);
@@ -264,6 +283,7 @@ int main(int argc, char **argv){
 	VecDestroy(&t);
 	VecDestroy(&uu);
 	VecDestroy(&uu_new);
+	VecDestroy(&duu);
 	MatDestroy(&A);
 
 	PetscFinalize();
